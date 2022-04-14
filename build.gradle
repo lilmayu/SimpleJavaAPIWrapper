@@ -1,0 +1,38 @@
+plugins {
+    id 'java'
+    id 'com.github.johnrengelman.shadow' version '7.0.0'
+}
+
+group 'dev.mayuna'
+version '1.0'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+
+    // GSON
+    compileOnly 'com.google.code.gson:gson:2.8.9'
+    testImplementation 'com.google.code.gson:gson:2.8.9'
+
+    // Lombok
+    compileOnly 'org.projectlombok:lombok:1.18.22'
+    annotationProcessor 'org.projectlombok:lombok:1.18.22'
+    testCompileOnly 'org.projectlombok:lombok:1.18.22'
+    testAnnotationProcessor 'org.projectlombok:lombok:1.18.22'
+
+    // JUnit
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.2'
+}
+
+shadowJar {
+    archivesBaseName = "simple-java-api-wrapper"
+}
+
+test {
+    useJUnit();
+}
+
+shadowJar.dependsOn test
