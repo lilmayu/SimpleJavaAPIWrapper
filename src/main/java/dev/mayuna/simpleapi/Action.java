@@ -4,6 +4,7 @@ import dev.mayuna.simpleapi.deserializers.GsonDeserializer;
 import dev.mayuna.simpleapi.exceptions.HttpException;
 import dev.mayuna.simpleapi.exceptions.MissingPathParametersException;
 import lombok.Getter;
+import lombok.NonNull;
 
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
@@ -27,27 +28,53 @@ public class Action<T> {
     private BiConsumer<HttpResponse<?>, T> successCallback = (responseBody, object) -> {};
     private Function<HttpResponse<?>, T> deserializationCallback = null;
 
-    public Action(SimpleAPI api, Class<T> responseClass, APIRequest apiRequest) {
+    /**
+     * Creates {@link Action} object
+     * @param api Your {@link SimpleAPI} object
+     * @param responseClass Non-null Class which you expect to be responded
+     * @param apiRequest Non-null {@link APIRequest}
+     */
+    public Action(SimpleAPI api, @NonNull Class<T> responseClass, @NonNull APIRequest apiRequest) {
         this.api = api;
         this.responseClass = responseClass;
         this.apiRequest = apiRequest;
     }
 
-    public Action<T> onHttpError(Consumer<HttpError> httpErrorCallback) {
+    /**
+     * {@link HttpError} {@link Consumer} which will be called if there would be any {@link HttpException}
+     * @param httpErrorCallback Non-null {@link HttpError} {@link Consumer}
+     * @return {@link Action}, great for chaining
+     */
+    public Action<T> onHttpError(@NonNull Consumer<HttpError> httpErrorCallback) {
         this.httpErrorCallback = httpErrorCallback;
         return this;
     }
 
+    /**
+     * {@link HttpResponse} and your response class {@link BiConsumer} which will be called if the request was successful
+     * @param successCallback Non-null {@link HttpResponse} and your response class {@link BiConsumer}
+     * @return {@link Action}, great for chaining
+     */
     public Action<T> onSuccess(BiConsumer<HttpResponse<?>, T> successCallback) {
         this.successCallback = successCallback;
         return this;
     }
 
+    /**
+     * {@link Function} with {@link HttpResponse} argument and your response class return<br>
+     * This {@link Function} will be called for deserializing. You should return your deserialized object here. If your API returns JSON, your can use {@link GsonDeserializer} to automate this step.
+     * @param deserializationCallback Nullable {@link Function} with {@link HttpResponse} argument and your response class return
+     * @return {@link Action}, great for chaining
+     */
     public Action<T> onDeserialization(Function<HttpResponse<?>, T> deserializationCallback) {
         this.deserializationCallback = deserializationCallback;
         return this;
     }
 
+    /**
+     * Requests the API with specified {@link APIRequest}
+     * @return {@link CompletableFuture}
+     */
     public CompletableFuture<T> execute() {
         CompletableFuture<T> completableFuture = new CompletableFuture<>();
         String urlStart = api.getURL();
@@ -86,11 +113,8 @@ public class Action<T> {
                 }
             }
 
-            if (apiRequest.getBodyPublisher() != null) {
-                httpRequestBuilder.method(apiRequest.getMethod(), apiRequest.getBodyPublisher());
-            } else {
-                httpRequestBuilder.method(apiRequest.getMethod(), HttpRequest.BodyPublishers.noBody());
-            }
+            apiRequest.getBodyPublisher();
+            httpRequestBuilder.method(apiRequest.getMethod(), apiRequest.getBodyPublisher());
 
             if (apiRequest.getContentType() != null) {
                 httpRequestBuilder.header("Content-Type", apiRequest.getContentType());
