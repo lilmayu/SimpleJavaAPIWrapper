@@ -29,6 +29,7 @@ dependencies {
 
 shadowJar {
     archivesBaseName = "simple-java-api-wrapper"
+    classifier = null
 }
 
 test {

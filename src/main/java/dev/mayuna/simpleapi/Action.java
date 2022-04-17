@@ -1,6 +1,5 @@
 package dev.mayuna.simpleapi;
 
-import dev.mayuna.simpleapi.deserializers.CustomDeserializer;
 import dev.mayuna.simpleapi.deserializers.GsonDeserializer;
 import dev.mayuna.simpleapi.exceptions.HttpException;
 import dev.mayuna.simpleapi.exceptions.MissingPathParametersException;
@@ -13,8 +12,10 @@ import java.net.URISyntaxException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 public class Action<T> {
 
@@ -24,6 +25,7 @@ public class Action<T> {
 
     private Consumer<HttpError> httpErrorCallback = httpError -> {throw new HttpException(httpError);};
     private BiConsumer<HttpResponse<?>, T> successCallback = (responseBody, object) -> {};
+    private Function<HttpResponse<?>, T> deserializationCallback = null;
 
     public Action(SimpleAPI api, Class<T> responseClass, APIRequest apiRequest) {
         this.api = api;
@@ -41,9 +43,15 @@ public class Action<T> {
         return this;
     }
 
-    public T execute() {
+    public Action<T> onDeserialization(Function<HttpResponse<?>, T> deserializationCallback) {
+        this.deserializationCallback = deserializationCallback;
+        return this;
+    }
+
+    public CompletableFuture<T> execute() {
+        CompletableFuture<T> completableFuture = new CompletableFuture<>();
         String urlStart = api.getURL();
-        String urlEndpoint = apiRequest.getEndpoint();
+        String urlEndpoint = apiRequest.getFinalEndpoint();
 
         if (urlStart.endsWith("/")) {
             urlStart = urlStart.substring(0, urlStart.length() - 2);
@@ -72,24 +80,49 @@ public class Action<T> {
             HttpRequest.Builder httpRequestBuilder = HttpRequest.newBuilder()
                     .uri(new URI(stringUrl));
 
-            if (api.defaultHeaders != null && api.defaultHeaders.length != 0) {
-                for (Header header : api.defaultHeaders) {
+            if (api.getDefaultHeads() != null && api.getDefaultHeads().length != 0) {
+                for (Header header : api.getDefaultHeads()) {
                     httpRequestBuilder.header(header.getName(), header.getValue());
                 }
             }
 
-            httpRequestBuilder.method(apiRequest.getMethod(), HttpRequest.BodyPublishers.noBody());
+            if (apiRequest.getBodyPublisher() != null) {
+                httpRequestBuilder.method(apiRequest.getMethod(), apiRequest.getBodyPublisher());
+            } else {
+                httpRequestBuilder.method(apiRequest.getMethod(), HttpRequest.BodyPublishers.noBody());
+            }
+
+            if (apiRequest.getContentType() != null) {
+                httpRequestBuilder.header("Content-Type", apiRequest.getContentType());
+            }
+
             apiRequest.processHttpRequestBuilder(httpRequestBuilder);
 
             HttpResponse<?> httpResponse = httpClient.send(httpRequestBuilder.build(), apiRequest.getBodyHandler());
             responseCode = httpResponse.statusCode();
 
-            T t = responseClass.getDeclaredConstructor().newInstance();
+            T t = null;
 
-            if (t instanceof CustomDeserializer) {
-                ((CustomDeserializer) t).deserialize(httpResponse.body());
-            } else if (t instanceof GsonDeserializer) {
-                t = ((GsonDeserializer) t).getGson().fromJson((String) httpResponse.body(), responseClass);
+            if (!responseClass.isArray()) {
+                t = responseClass.getDeclaredConstructor().newInstance();
+
+                if (t instanceof GsonDeserializer) {
+                    t = ((GsonDeserializer) t).getGson().fromJson((String) httpResponse.body(), responseClass);
+                } else {
+                    if (deserializationCallback != null) {
+                        t = deserializationCallback.apply(httpResponse);
+                    }
+                }
+            } else {
+                Object object = responseClass.getComponentType().getDeclaredConstructor().newInstance();
+
+                if (object instanceof GsonDeserializer) {
+                    t = ((GsonDeserializer) object).getGson().fromJson((String) httpResponse.body(), responseClass);
+                } else {
+                    if (deserializationCallback != null) {
+                        t = deserializationCallback.apply(httpResponse);
+                    }
+                }
             }
 
             if (t instanceof APIResponse) {
@@ -98,12 +131,13 @@ public class Action<T> {
             }
 
             successCallback.accept(httpResponse, t);
-
-            return t;
+            completableFuture.complete(t);
         } catch (IOException | InterruptedException | InvocationTargetException | InstantiationException | IllegalAccessException | NoSuchMethodException | URISyntaxException
                 exception) {
             httpErrorCallback.accept(new HttpError(responseCode, exception));
-            return null;
+            completableFuture.completeExceptionally(exception);
         }
+
+        return completableFuture;
     }
 }

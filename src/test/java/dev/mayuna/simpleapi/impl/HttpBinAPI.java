@@ -1,24 +1,43 @@
 package dev.mayuna.simpleapi.impl;
 
-import dev.mayuna.simpleapi.Action;
-import dev.mayuna.simpleapi.Header;
-import dev.mayuna.simpleapi.SimpleAPI;
+import com.google.gson.JsonObject;
+import dev.mayuna.simpleapi.*;
 import dev.mayuna.simpleapi.impl.api.HttpBinResponse;
 
-public class HttpBinAPI extends SimpleAPI {
+import java.net.http.HttpRequest;
+import java.util.Random;
 
-    public HttpBinAPI() {
-        this.defaultHeaders = new Header[]{
-            new Header("DefaultHeaderName", "DefaultHeaderValue")
-        };
-    }
+public class HttpBinAPI extends SimpleAPI {
 
     @Override
     public String getURL() {
         return "https://httpbin.org";
     }
 
+    @Override
+    public Header[] getDefaultHeads() { // Optional, good for token authorization, etc
+        return new Header[]{
+                new Header("DefaultHeaderName", "DefaultHeaderValue")
+        };
+    }
+
     public Action<HttpBinResponse> requestAnything() {
-        return new Action<>(this, HttpBinResponse.class, new HttpBinResponse.Request());
+        JsonObject jsonObject = new JsonObject();
+        jsonObject.addProperty("test", 100);
+
+        return new Action<>(this,
+                            HttpBinResponse.class,
+                            new APIRequest.Builder()
+                                    .setEndpoint("/anything?test={test_id}") // Required
+                                    .setMethod("POST") // Required
+                                    .addPathParameter(new PathParameter("test_id", String.valueOf(new Random().nextInt())))
+                                    .addQuery(new Query("some_query", "69"))
+                                    .setHttpRequestBuilder(builder -> {
+                                        builder.header("HeaderName", "HeaderValue");
+                                    })
+                                    .setContentType("application/json")
+                                    .setBodyPublisher(HttpRequest.BodyPublishers.ofString(jsonObject.toString()))
+                                    .build()
+        );
     }
 }
