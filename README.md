@@ -40,7 +40,7 @@ dependencies {
 ## Documentation
 - [docs.mayuna.dev](https://docs.mayuna.dev/en/) - In making...
 - [Javadoc](https://data.mayuna.dev/javadocs/simple-java-api-wrapper/)
-- You can also find example in [tests](/tree/main/src/test/java/dev/mayuna/simpleapi)
+- You can also find example in [tests](https://github.com/lilmayu/SimpleJavaAPIWrapper/tree/main/src/test/java/dev/mayuna/simpleapi)
 
 ## Projects which use this framework
 - [top-gg4j](https://github.com/lilmayu/top-gg4j)
