@@ -38,7 +38,7 @@ dependencies {
 - You can also use [GitHub Releases](https://github.com/lilmayu/SimpleJavaAPIWrapper/releases)
 
 ## Documentation
-- [docs.mayuna.dev](https://docs.mayuna.dev/en/) - In making...
+- [docs.mayuna.dev](https://docs.mayuna.dev/) - In making...
 - [Javadoc](https://data.mayuna.dev/javadocs/simple-java-api-wrapper/)
 - You can also find example in [tests](https://github.com/lilmayu/SimpleJavaAPIWrapper/tree/main/src/test/java/dev/mayuna/simpleapi)
 
