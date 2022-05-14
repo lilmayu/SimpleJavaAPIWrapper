@@ -18,6 +18,11 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+/**
+ * This class is used for requesting specified {@link APIRequest}. <b>You have to call {@link #execute()} to actually request the API</b>. There
+ * are also few other methods like {@link #onSuccess(BiConsumer)} which you can use to receive responses in callback fashion.
+ * @param <T> Class which is expected to be returned from the API
+ */
 public class Action<T> {
 
     private final @Getter SimpleAPI api;
@@ -130,6 +135,11 @@ public class Action<T> {
             if (!responseClass.isArray()) {
                 t = responseClass.getDeclaredConstructor().newInstance();
 
+                if (t instanceof APIResponse) {
+                    ((APIResponse) t).responseCode = responseCode;
+                    ((APIResponse) t).api = api;
+                }
+
                 if (t instanceof GsonDeserializer) {
                     t = ((GsonDeserializer) t).getGson().fromJson((String) httpResponse.body(), responseClass);
                 } else {
@@ -145,13 +155,18 @@ public class Action<T> {
                 } else {
                     if (deserializationCallback != null) {
                         t = deserializationCallback.apply(httpResponse);
+
+                        if (object instanceof APIResponse) {
+
+                            T[] genericArray = (T[]) t;
+
+                            for (T arrayObject : genericArray) {
+                                ((APIResponse) arrayObject).responseCode = responseCode;
+                                ((APIResponse) arrayObject).api = api;
+                            }
+                        }
                     }
                 }
-            }
-
-            if (t instanceof APIResponse) {
-                ((APIResponse) t).responseCode = responseCode;
-                ((APIResponse) t).api = api;
             }
 
             successCallback.accept(httpResponse, t);
