@@ -3,6 +3,7 @@ package dev.mayuna.simpleapi;
 import lombok.Getter;
 import lombok.NonNull;
 
+import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.function.Consumer;
@@ -94,6 +95,14 @@ public interface APIRequest {
     }
 
     /**
+     * Returns redirect policy which will be used when requesting.
+     * @return Non-null {@link java.net.http.HttpClient.Redirect}
+     */
+    default @NonNull HttpClient.Redirect getRedirectPolicy() {
+        return HttpClient.Redirect.NORMAL;
+    }
+
+    /**
      * You should not override this method.<br>
      * This method is used for inserting specified queries in {@link #getQueries()} method
      *
@@ -123,6 +132,7 @@ public interface APIRequest {
         private @Getter Consumer<HttpRequest.Builder> httpRequestBuilderConsumer;
         private @Getter HttpRequest.BodyPublisher bodyPublisher;
         private @Getter HttpResponse.BodyHandler<?> bodyHandler;
+        private @Getter HttpClient.Redirect redirectPolicy;
 
         public Builder() {
 
@@ -199,6 +209,15 @@ public interface APIRequest {
                         return bodyHandler;
                     } else {
                         return APIRequest.super.getBodyHandler();
+                    }
+                }
+
+                @Override
+                public @NonNull HttpClient.Redirect getRedirectPolicy() {
+                    if (redirectPolicy != null) {
+                        return redirectPolicy;
+                    } else {
+                        return APIRequest.super.getRedirectPolicy();
                     }
                 }
             };
@@ -356,6 +375,17 @@ public interface APIRequest {
          */
         public Builder setBodyHandler(@NonNull HttpResponse.BodyHandler<?> bodyHandler) {
             this.bodyHandler = bodyHandler;
+            return this;
+        }
+
+        /**
+         * Sets {@link java.net.http.HttpClient.Redirect} policy
+         * @param redirectPolicy Non-null {@link java.net.http.HttpClient.Redirect}
+         * @return {@link Builder}, great for chaining
+         * @see APIRequest#getRedirectPolicy()
+         */
+        public Builder setRedirectPolicy(@NonNull HttpClient.Redirect redirectPolicy) {
+            this.redirectPolicy = redirectPolicy;
             return this;
         }
     }

@@ -108,7 +108,9 @@ public class Action<T> {
         int responseCode = -1;
 
         try {
-            HttpClient httpClient = HttpClient.newHttpClient();
+            HttpClient httpClient = HttpClient.newBuilder()
+                    .followRedirects(apiRequest.getRedirectPolicy())
+                    .build();
             HttpRequest.Builder httpRequestBuilder = HttpRequest.newBuilder()
                     .uri(new URI(stringUrl));
 
