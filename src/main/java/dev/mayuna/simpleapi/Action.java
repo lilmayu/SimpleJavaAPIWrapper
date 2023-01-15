@@ -1,5 +1,6 @@
 package dev.mayuna.simpleapi;
 
+import com.google.gson.JsonSyntaxException;
 import dev.mayuna.simpleapi.deserializers.GsonDeserializer;
 import dev.mayuna.simpleapi.exceptions.HttpException;
 import dev.mayuna.simpleapi.exceptions.MissingPathParametersException;
@@ -143,7 +144,12 @@ public class Action<T> {
                 }
 
                 if (t instanceof GsonDeserializer) {
-                    t = ((GsonDeserializer) t).getGson().fromJson((String) httpResponse.body(), responseClass);
+                    try {
+                        t = ((GsonDeserializer) t).getGson().fromJson((String) httpResponse.body(), responseClass);
+                    } catch (JsonSyntaxException exception) {
+                        completableFuture.completeExceptionally(exception);
+                        return completableFuture;
+                    }
                 } else {
                     if (deserializationCallback != null) {
                         t = deserializationCallback.apply(httpResponse);
@@ -153,7 +159,12 @@ public class Action<T> {
                 Object object = responseClass.getComponentType().getDeclaredConstructor().newInstance();
 
                 if (object instanceof GsonDeserializer) {
-                    t = ((GsonDeserializer) object).getGson().fromJson((String) httpResponse.body(), responseClass);
+                    try {
+                        t = ((GsonDeserializer) object).getGson().fromJson((String) httpResponse.body(), responseClass);
+                    } catch (JsonSyntaxException exception) {
+                        completableFuture.completeExceptionally(exception);
+                        return completableFuture;
+                    }
                 } else {
                     if (deserializationCallback != null) {
                         t = deserializationCallback.apply(httpResponse);
