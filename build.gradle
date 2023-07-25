@@ -1,14 +1,14 @@
 plugins {
     id 'java'
-    id 'io.codearte.nexus-staging' version '0.11.0'
+    id 'java-library'
+    id 'signing'
+    id 'maven-publish'
+    id "com.github.johnrengelman.shadow" version "8.1.1"
+    id "io.github.gradle-nexus.publish-plugin" version "1.1.0"
 }
 
-apply plugin: 'maven'
-apply plugin: 'maven-publish'
-apply plugin: 'signing'
-
 group 'dev.mayuna'
-version '1.0.3'
+version '2.0'
 
 repositories {
     mavenCentral()
@@ -19,6 +19,9 @@ dependencies {
     compileOnly 'com.google.code.gson:gson:2.9.0'
     testImplementation 'com.google.code.gson:gson:2.9.0'
 
+    // Jetbrains annotations
+    implementation 'org.jetbrains:annotations:24.0.0'
+
     // Lombok
     compileOnly 'org.projectlombok:lombok:1.18.22'
     annotationProcessor 'org.projectlombok:lombok:1.18.22'
@@ -28,84 +31,107 @@ dependencies {
     // JUnit
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.2'
+    testRuntimeOnly("org.junit.vintage:junit-vintage-engine:5.8.2")
 }
 
-task compileLibrary(type: Jar) {
-    from { configurations.compile.findAll { !it.name.endsWith('pom') }.collect { it.isDirectory() ? it : zipTree(it) } }
-    with jar
+
+// == Quick tasks == //
+
+task publishCloseAndRelease() {
+    dependsOn 'publishToSonatype'
+    dependsOn 'closeAndReleaseSonatypeStagingRepository'
+}
+
+shadowJar {
+
 }
 
 test {
-    useJUnit();
+    useJUnitPlatform()
 }
 
-uploadArchives {
-    repositories {
-        mavenDeployer {
-            beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}
 
-            repository(url: "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/") {
-                authentication(userName: ossrhUsername, password: ossrhPassword)
-            }
+test {
+    useJUnitPlatform();
+}
 
-            snapshotRepository(url: "https://s01.oss.sonatype.org/content/repositories/snapshots/") {
-                authentication(userName: ossrhUsername, password: ossrhPassword)
-            }
+// == Maven publishing == //
 
-            pom.project {
-                name 'simple-java-api-wrapper'
-                packaging 'jar'
-                // optionally artifactId can be defined here
-                description 'Framework for easier API wrapping made in Java'
-                url 'https://mayuna.dev/'
+publishing {
+
+    publications {
+        shadow(MavenPublication) {
+            groupId = 'dev.mayuna'
+            artifactId = 'simple-java-api-wrapper'
+            version = getVersion()
+            from components.java
+
+            pom {
+                name = 'simple-java-api-wrapper'
+                description = 'Super lightweight framework for easier API wrapping made in Java'
+                url = 'https://mayuna.dev/'
 
                 scm {
-                    connection 'scm:https://github.com/lilmayu/SimpleJavaAPIWrapper'
-                    developerConnection 'scm:git:https://github.com/lilmayu/SimpleJavaAPIWrapper.git'
-                    url 'https://github.com/lilmayu/SimpleJavaAPIWrapper'
+                    connection = 'scm:https://github.com/lilmayu/SimpleJavaAPIWrapper'
+                    developerConnection = 'scm:git:https://github.com/lilmayu/SimpleJavaAPIWrapper.git'
+                    url = 'https://github.com/lilmayu/SimpleJavaAPIWrapper'
                 }
 
                 licenses {
                     license {
-                        name 'Apache License 2.0'
-                        url 'https://www.apache.org/licenses/LICENSE-2.0'
+                        name = 'Apache License 2.0'
+                        url = 'https://www.apache.org/licenses/LICENSE-2.0'
                     }
                 }
 
                 developers {
                     developer {
-                        id 'mayuna'
-                        name 'Marek Lof'
-                        email 'uwulilmayu@gmail.com'
+                        id = 'mayuna'
+                        name = 'Marek Lof'
+                        email = 'uwulilmayu@gmail.com'
                     }
                 }
             }
         }
     }
-}
 
-nexusStaging {
-    packageGroup = "dev.mayuna" //optional if packageGroup == project.getGroup()
-}
+    publishing {
+        repositories {
+            maven {
+                credentials {
+                    username = "$ossrhUsername"
+                    password = "$ossrhPassword"
+                }
 
-task javadocJar(type: Jar) {
-    classifier = 'javadoc'
-    from javadoc
-}
-
-task sourcesJar(type: Jar) {
-    classifier = 'sources'
-    from sourceSets.main.allSource
-}
-
-artifacts {
-    archives javadocJar, sourcesJar
+                url = "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/"
+            }
+        }
+    }
 }
 
 signing {
-    sign configurations.archives
+    sign publishing.publications.shadow
 }
 
-compileLibrary.dependsOn test
-compileLibrary.dependsOn javadocJar
-compileLibrary.dependsOn sourcesJar
+nexusPublishing {
+    repositories {
+        sonatype {
+            nexusUrl.set(uri("https://s01.oss.sonatype.org/service/local/"))
+            snapshotRepositoryUrl.set(uri("https://s01.oss.sonatype.org/content/repositories/snapshots/"))
+            username = "$ossrhUsername"
+            password = "$ossrhPassword"
+        }
+    }
+}
+
+java {
+    withJavadocJar()
+    withSourcesJar()
+}
+
+shadowJar.dependsOn javadocJar
+shadowJar.dependsOn sourcesJar
+shadowJar.dependsOn jar
