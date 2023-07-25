@@ -223,7 +223,7 @@ public interface ApiRequest<T> {
         }
 
         if (responseInstance instanceof DeserializableApiResponse) {
-            responseInstance = (T) ((DeserializableApiResponse) responseInstance).deserialize(httpResponse.body());
+            responseInstance = (T) ((DeserializableApiResponse) responseInstance).deserialize(this, httpResponse);
         }
 
         return responseInstance;
