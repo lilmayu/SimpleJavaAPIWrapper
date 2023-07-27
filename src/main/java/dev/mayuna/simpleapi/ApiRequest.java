@@ -6,13 +6,10 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ThreadFactory;
 
 /**
  * Represents an API request. Can send API requests.
@@ -120,33 +117,7 @@ public interface ApiRequest<T> {
      * @return The computed endpoint of this {@link ApiRequest} with all {@link PathParameter}s replaces and {@link RequestQuery}s added.
      */
     default String getComputedEndpoint() {
-        String computedEndpoint = getEndpoint();
-
-        PathParameter[] pathParameters = getPathParameters();
-        if (pathParameters != null && pathParameters.length > 0) {
-            for (PathParameter pathParameter : getPathParameters()) {
-                //noinspection DataFlowIssue
-                computedEndpoint = computedEndpoint.replace("{" + pathParameter.getId() + "}", pathParameter.getReplacement());
-            }
-        }
-
-        RequestQuery[] requestQueries = getRequestQueries();
-
-        if (requestQueries != null && requestQueries.length > 0) {
-            for (int i = 0; i < requestQueries.length; i++) {
-                RequestQuery requestQuery = requestQueries[i];
-
-                String querySymbol = "&";
-
-                if (i == 0) {
-                    querySymbol = "?";
-                }
-
-                computedEndpoint += querySymbol + requestQuery.getName() + "=" + requestQuery.getValue();
-            }
-        }
-
-        return computedEndpoint;
+        return getWrappedApi().computeEndpoint(this);
     }
 
     /**
@@ -156,11 +127,7 @@ public interface ApiRequest<T> {
      * @param requestHeaders     The {@link RequestHeader}s to apply.
      */
     default void applyHeadersToHttpRequestBuilder(HttpRequest.Builder httpRequestBuilder, RequestHeader[] requestHeaders) {
-        if (requestHeaders != null) {
-            for (RequestHeader requestHeader : requestHeaders) {
-                httpRequestBuilder.header(requestHeader.getKey(), requestHeader.getValue());
-            }
-        }
+        getWrappedApi().applyHeadersToHttpRequestBuilder(this, httpRequestBuilder, requestHeaders);
     }
 
     /**
@@ -169,7 +136,7 @@ public interface ApiRequest<T> {
      * @return The created {@link HttpClient} instance.
      */
     default HttpClient createHttpClientInstance() {
-        return HttpClient.newBuilder().build();
+        return getWrappedApi().createHttpClientInstance();
     }
 
     /**
@@ -178,7 +145,7 @@ public interface ApiRequest<T> {
      * @return The created {@link HttpRequest.Builder} instance.
      */
     default HttpRequest.Builder createHttpRequestBuilderInstance() {
-        return HttpRequest.newBuilder();
+        return getWrappedApi().createHttpRequestBuilderInstance();
     }
 
     /**
@@ -192,11 +159,7 @@ public interface ApiRequest<T> {
      * @throws IllegalAccessException    Is thrown if the constructor of the response class is not accessible.
      */
     default T createInstanceOfResponseClass() throws NoSuchMethodException, InvocationTargetException, InstantiationException, IllegalAccessException {
-        if (getResponseClass().isArray()) {
-            throw new RuntimeException("Cannot create instance of array");
-        }
-
-        return getResponseClass().getDeclaredConstructor().newInstance();
+        return getWrappedApi().createInstanceOfResponseClass(getResponseClass());
     }
 
     /**
@@ -211,48 +174,25 @@ public interface ApiRequest<T> {
      * @throws InstantiationException    Is thrown if the response class is abstract or interface.
      * @throws IllegalAccessException    Is thrown if the constructor of the response class is not accessible.
      */
-    @SuppressWarnings({"rawtypes", "unchecked"})
     default T handleResponse(HttpResponse<?> httpResponse) throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
-        T responseInstance = createInstanceOfResponseClass();
-
-        if (responseInstance instanceof ApiResponse) {
-            ApiResponse apiResponse = (ApiResponse) responseInstance;
-
-            apiResponse.setHttpStatusCode(httpResponse.statusCode());
-            apiResponse.setWrappedApi(getWrappedApi());
-        }
-
-        if (responseInstance instanceof DeserializableApiResponse) {
-            responseInstance = (T) ((DeserializableApiResponse) responseInstance).deserialize(this, httpResponse);
-        }
-
-        return responseInstance;
+        return getWrappedApi().handleResponse(this, httpResponse);
     }
 
     /**
-     * Gets the {@link ThreadFactory} to use for sending the async request.
-     *
-     * @return The {@link ThreadFactory} to use for sending the async request.
-     */
-    default ThreadFactory getThreadFactory() {
-        return Thread::new;
-    }
-
-    /**
-     * Sends the request asynchronously.
+     * Sends the request asynchronously using {@link WrappedApi#runAsync(Runnable)}.
      *
      * @return A {@link CompletableFuture} that will be completed with the instance of response class.
      */
     default CompletableFuture<T> sendAsync() {
         CompletableFuture<T> completableFuture = new CompletableFuture<>();
 
-        getThreadFactory().newThread(() -> {
+        getWrappedApi().runAsync(() -> {
             try {
                 completableFuture.complete(send());
-            } catch (Exception exception) {
-                completableFuture.completeExceptionally(exception);
+            } catch (Throwable throwable) {
+                completableFuture.completeExceptionally(throwable);
             }
-        }).start();
+        });
 
         return completableFuture;
     }
@@ -270,30 +210,6 @@ public interface ApiRequest<T> {
      * @throws IllegalAccessException    Is thrown if the constructor of the response class is not accessible.
      */
     default T send() throws IOException, InterruptedException, InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
-        String url = getUrl();
-
-        if (url == null) {
-            url = getWrappedApi().getDefaultUrl();
-        }
-
-        String requestUrl = url + getComputedEndpoint();
-
-        HttpClient httpClient = createHttpClientInstance();
-        HttpRequest.Builder httpRequestBuilder = createHttpRequestBuilderInstance();
-
-        try {
-            httpRequestBuilder.uri(new URI(requestUrl));
-        } catch (IllegalArgumentException | URISyntaxException e) {
-            throw new RuntimeException("Invalid URI " + requestUrl, e);
-        }
-
-        applyHeadersToHttpRequestBuilder(httpRequestBuilder, getRequestHeaders());
-        httpRequestBuilder.method(getRequestMethod().getName(), getBodyPublisher());
-
-        getWrappedApi().onApiRequest(this);
-
-        HttpResponse<?> httpResponse = httpClient.send(httpRequestBuilder.build(), getBodyHandler());
-
-        return handleResponse(httpResponse);
+        return getWrappedApi().send(this);
     }
 }
