@@ -7,6 +7,7 @@ import java.net.URISyntaxException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 
 public interface WrappedApi {
 
@@ -112,6 +113,15 @@ public interface WrappedApi {
     }
 
     /**
+     * Gets the default timeout duration for the API requests.
+     *
+     * @return The default timeout duration for the API requests.
+     */
+    default Duration getTimeoutDuration() {
+        return Duration.ofSeconds(10);
+    }
+
+    /**
      * This method is used for async requests. You may override this method to change the way async requests are sent, for example, using a thread
      * pool, etc.
      *
@@ -203,6 +213,7 @@ public interface WrappedApi {
 
         HttpClient httpClient = createHttpClientInstance();
         HttpRequest.Builder httpRequestBuilder = createHttpRequestBuilderInstance();
+        httpRequestBuilder.timeout(getTimeoutDuration());
 
         try {
             httpRequestBuilder.uri(new URI(requestUrl));
