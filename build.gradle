@@ -102,8 +102,8 @@ publishing {
         repositories {
             maven {
                 credentials {
-                    username = "$ossrhUsername"
-                    password = "$ossrhPassword"
+                    username = project.properties['ossrhUsername'] ?: System.getenv('ossrhUsername')
+                    password = project.properties['ossrhPassword'] ?: System.getenv('ossrhPassword')
                 }
 
                 url = "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/"
@@ -113,6 +113,9 @@ publishing {
 }
 
 signing {
+    def signingKey = findProperty("signingKey")
+    def signingPassword = findProperty("signingPassword")
+    useInMemoryPgpKeys(signingKey, signingPassword)
     sign publishing.publications.shadow
 }
 
@@ -121,8 +124,8 @@ nexusPublishing {
         sonatype {
             nexusUrl.set(uri("https://s01.oss.sonatype.org/service/local/"))
             snapshotRepositoryUrl.set(uri("https://s01.oss.sonatype.org/content/repositories/snapshots/"))
-            username = "$ossrhUsername"
-            password = "$ossrhPassword"
+            username = project.properties['ossrhUsername'] ?: System.getenv('ossrhUsername')
+            password = project.properties['ossrhPassword'] ?: System.getenv('ossrhPassword')
         }
     }
 }
@@ -135,3 +138,7 @@ java {
 shadowJar.dependsOn javadocJar
 shadowJar.dependsOn sourcesJar
 shadowJar.dependsOn jar
+
+components.java.withVariantsFromConfiguration(configurations.shadowRuntimeElements) {
+    skip()
+}
