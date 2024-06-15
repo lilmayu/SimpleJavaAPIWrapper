@@ -5,6 +5,8 @@ plugins {
     id 'maven-publish'
     id "com.github.johnrengelman.shadow" version "8.1.1"
     id "io.github.gradle-nexus.publish-plugin" version "1.1.0"
+    id 'jacoco'
+    id 'jacoco-report-aggregation'
 }
 
 group 'dev.mayuna'
@@ -56,6 +58,13 @@ tasks.withType(JavaCompile) {
 
 test {
     useJUnitPlatform();
+    finalizedBy jacocoTestReport
+}
+
+tasks.jacocoTestReport {
+    reports {
+        csv.required = true
+    }
 }
 
 // == Maven publishing == //
